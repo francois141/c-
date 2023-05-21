@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <assert.h>
 
 class MyClass{
 public:
@@ -44,7 +45,12 @@ int main() {
 
     std::shared_ptr<MyClass> pointerShared = std::make_shared<MyClass>();
 
+    assert(pointerShared.unique());
+
     printValueShared(pointerShared);
+
+    assert(pointerShared.unique());
+
 
     return 0;
 }
