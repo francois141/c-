@@ -12,6 +12,8 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    assert(size == 4); // Otherwise output is wrong
+
     vector<int> a(10000);
 
     random_device rd;
