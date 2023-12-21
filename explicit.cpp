@@ -9,7 +9,6 @@ public:
     }
 };
 
-
 int main() {
     sample s1 = static_cast<sample>(3);
     sample s2 = static_cast<sample>(4);
