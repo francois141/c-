@@ -24,6 +24,8 @@ int main(int argc, char **argv) {
 
     int val = 2;
     int tmp;
+
+    // Compare and swap will always succeed
     MPI_Compare_and_swap(&val, window_buffer,&tmp, MPI_INT, 0, 0, win);
 
     MPI_Win_fence(0, win);
