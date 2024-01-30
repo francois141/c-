@@ -24,12 +24,12 @@ int main(int argc, char **argv) {
 
     MPI_Win_fence(0, win);
 
-    int val = 0;
-    MPI_Get(&val, 1,MPI_INT, 0, 0,1, MPI_INT, win);
+    int val = 34;
+    if (rank == 0) MPI_Put(&val, 1,MPI_INT, 1, 0,1, MPI_INT, win);
 
     MPI_Win_fence(0, win);
 
-    string message = to_string(rank) + " " + to_string(val) + "\n";
+    string message = to_string(rank) + " " + to_string(window_buffer[0]) + "\n";
     cout << message;
 
     MPI_Win_free(&win);
