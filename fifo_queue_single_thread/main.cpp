@@ -3,6 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <new>
 
 #include <assert.h>
 
@@ -76,9 +77,113 @@ private:
     std::atomic<std::size_t> popCursor;
 };
 
-bool run_benchmark(int nb_times = 10000, int capacity = 127) {
+template<typename T>
+class Fifo2
+{
+public:
+    explicit Fifo2() : Fifo2(128),capacity_mask(127) {
 
-    std::vector<Fifo<int>> values(nb_times, Fifo<int>(capacity));
+    }
+
+    // Hard code capacity to friendly number
+    explicit Fifo2(std::size_t capacity): capacity_(128),capacity_mask(127), pushCursor(0), popCursor(0) {
+        ring = new T[capacity_];
+    }
+
+    Fifo2(const Fifo2<T> &other) : capacity_(other.capacity_), capacity_mask(other.capacity_mask) {
+        pushCursor.store(other.pushCursor.load(), std::memory_order_seq_cst);
+        popCursor.store(other.popCursor.load(), std::memory_order_seq_cst);
+
+        ring = new T[capacity_];
+
+        for(int i = 0; i < capacity_;i++) {
+            ring[i] = other.ring[i];
+        }
+    }
+
+    ~Fifo2() {
+        delete ring;
+    }
+
+    std::size_t capacity() const { return capacity_; }
+    std::size_t size() const { return pushCursor - popCursor; }
+
+    bool empty() const { return size() == 0;}
+    bool full() const {return size() == capacity(); }
+
+    template<typename T2>
+    inline bool full(const T2 pushCursor_, const T2 popCursor_) {
+        return (pushCursor_ - popCursor_) == capacity_;
+    }
+
+    template<typename T2>
+    inline bool empty(const T2 pushCursor_, const T2 popCursor_) {
+        return (pushCursor_ - popCursor_) == 0;
+    }
+
+    bool push(T const& value) {
+        auto pushCursor_ = pushCursor.load(std::memory_order_relaxed);
+
+        if (full(pushCursor_, popCursorNonAtomic)) {
+            popCursorNonAtomic = popCursor.load(std::memory_order_relaxed);
+            if(full(pushCursor_, popCursorNonAtomic)) {
+                return false;
+            }
+        }
+
+        ring[pushCursor & capacity_mask] = value;
+
+        // Known concurrency bug, but it seems that it never crashes
+        // In reality, we should use std::memory_model_release
+        pushCursor.store(pushCursor_ + 1, std::memory_order_relaxed);
+
+        return true;
+    }
+
+    bool pop_blocking(T&value) {
+        while(empty()) {}
+        return pop(value);
+    }
+
+    bool pop(T& value) {
+        auto popCursor_ = popCursor.load(std::memory_order_relaxed);
+
+        if(empty(pushCursorNonAtomic, popCursor_)) {
+            pushCursorNonAtomic = pushCursor.load(std::memory_order_relaxed);;
+            if(empty(pushCursorNonAtomic, popCursor_)) {
+                return false;
+            }
+        }
+
+        value = ring[popCursor & capacity_mask];
+        ring[popCursor & capacity_mask].~T();
+
+        // Known concurrency bug, but it seems that it never crashes
+        // In reality, we should use std::memory_model_release
+        popCursor.store(popCursor_ + 1, std::memory_order_relaxed);
+
+        return true;
+    }
+
+    T* ring;
+private:
+    // std::hardware_destructive_interference_size would work on a linux
+    // Avoid false sharing between the elements
+    alignas(64) std::atomic<std::size_t> pushCursor;
+    alignas(64) std::atomic<std::size_t> popCursor;
+
+    // Common trick -> first spin with non-atomic & check atomic only if required
+    alignas(64) std::size_t pushCursorNonAtomic;
+    alignas(64) std::size_t popCursorNonAtomic;
+
+    std::size_t capacity_;
+    std::size_t capacity_mask;
+};
+
+template<typename T>
+double run_benchmark(int nb_times = 10000, int capacity = 127) {
+
+    std::vector<T> values(nb_times, T(capacity));
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -99,15 +204,27 @@ bool run_benchmark(int nb_times = 10000, int capacity = 127) {
     auto end = std::chrono::high_resolution_clock::now();
 
     double time_taken = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() * 1e-9;
-    std::cout << "Time taken by program is : " << std::fixed << time_taken << " sec" << std::endl;
 
-    return true;
+    return time_taken;
 }
 
 
 int main() {
 
-    run_benchmark();
+    std::cout << "===== Warm up =====" << std::endl;
+    run_benchmark<Fifo<int>>();
+
+    double total = 0.0;
+    int nb_runs = 10;
+
+    for(int i = 0; i < nb_runs;i++) {
+        double naive = run_benchmark<Fifo<int>>();
+        double optimized = run_benchmark<Fifo2<int>>();
+        double speedup = naive / optimized;
+        total += speedup;
+    }
+
+    std::cout << "Speedup : " << total / nb_runs << std::endl;
 
     return 0;
 }
