@@ -4,8 +4,48 @@
 #include <thread>
 #include <atomic>
 #include <new>
+#include <mutex>
 
 #include <assert.h>
+
+template <size_t N>
+class MyBuffer {
+    public:
+        MyBuffer() {
+            size = N;
+            buffer = malloc(N);
+            memset(buffer, 0, N);
+        }
+
+        MyBuffer(const MyBuffer<N> &other) {
+            size = other.size;
+            buffer = malloc(size);
+            memcpy(buffer, other.buffer, size);
+        }
+
+        MyBuffer (MyBuffer<N>&& other) {
+            size = other.size;
+            buffer = other.buffer;
+        }
+
+        MyBuffer& operator= (MyBuffer<N>&& other) {
+            size = other.size;
+            buffer = other.buffer;
+            return *this;
+        }
+
+        MyBuffer<N>& operator=(const MyBuffer<N> &other) {
+            size = other.size;
+            buffer = malloc(size);
+            memcpy(buffer, other.buffer, size);
+            return *this;
+        }
+
+    private:
+        void *buffer;
+        size_t size;
+
+};
 
 template<typename T>
 class Fifo
@@ -20,8 +60,8 @@ public:
     }
 
     Fifo(const Fifo<T> &other) : capacity_(other.capacity_) {
-        pushCursor.store(other.pushCursor.load(), std::memory_order_seq_cst);
-        popCursor.store(other.popCursor.load(), std::memory_order_seq_cst);
+        pushCursor = other.pushCursor;
+        popCursor = other.pushCursor;
 
         ring = new T[capacity_];
 
@@ -41,6 +81,7 @@ public:
     bool full() const {return size() == capacity(); }
 
     bool push(T const& value) {
+        const std::lock_guard<std::mutex> lock_guard(lock);
         if(full()) {
             return false;
         }
@@ -57,6 +98,8 @@ public:
     }
 
     bool pop(T& value) {
+        const std::lock_guard<std::mutex> lock_guard(lock);
+
         if(empty()) {
             return false;
         }
@@ -73,8 +116,10 @@ public:
 private:
     std::size_t capacity_;
 
-    std::atomic<std::size_t> pushCursor;
-    std::atomic<std::size_t> popCursor;
+    std::size_t pushCursor;
+    std::size_t popCursor;
+
+    std::mutex lock;
 };
 
 template<typename T>
@@ -121,7 +166,7 @@ public:
         return (pushCursor_ - popCursor_) == 0;
     }
 
-    bool push(T const& value) {
+    bool push(T& value) {
         auto pushCursor_ = pushCursor.load(std::memory_order_relaxed);
 
         if (full(pushCursor_, popCursorNonAtomic)) {
@@ -131,7 +176,8 @@ public:
             }
         }
 
-        ring[pushCursor & capacity_mask] = value;
+        // Call move assignment operator, removes one allocation + extra copy
+        ring[pushCursor & capacity_mask] = std::move(value);
 
         // Known concurrency bug, but it seems that it never crashes
         // In reality, we should use std::memory_model_release
@@ -155,6 +201,7 @@ public:
             }
         }
 
+        // TODO: Use move assignment operator
         value = ring[popCursor & capacity_mask];
         ring[popCursor & capacity_mask].~T();
 
@@ -181,20 +228,21 @@ private:
 };
 
 template<typename T>
-double run_benchmark(int nb_times = 10000, int capacity = 127) {
-
+double run_benchmark(int nb_times = 2000, int capacity = 127) {
     std::vector<T> values(nb_times, T(capacity));
 
     auto start = std::chrono::high_resolution_clock::now();
 
     for(int i = 0; i < nb_times;i++) {
         std::thread producer([&values](int idx) -> void {
-            for(int j = 0; j < values[idx].capacity();j++) { values[idx].push(j); }
+            MyBuffer<4096> buffer;
+            for(int j = 0; j < values[idx].capacity();j++) { values[idx].push(buffer); }
         }, 1);
 
         std::thread consumer([&values](int idx) -> void {
-            int out;
-            for(int j = 0; j < values[idx].capacity();j++) { values[idx].pop_blocking(out); assert(out == j); }
+            MyBuffer<4096> out;
+            for(int j = 0; j < values[idx].capacity();j++) { values[idx].pop_blocking(out);
+            /*assert(out.cnt == j);*/ }
         }, 1);
 
         producer.join();
@@ -210,16 +258,22 @@ double run_benchmark(int nb_times = 10000, int capacity = 127) {
 
 
 int main() {
+    MyBuffer<4096> f1;
+    MyBuffer<4096> f2;
+    f2 = std::move(f1);
+
 
     std::cout << "===== Warm up =====" << std::endl;
-    run_benchmark<Fifo<int>>();
+    run_benchmark<Fifo<MyBuffer<4096>>>();
 
     double total = 0.0;
-    int nb_runs = 10;
+    int nb_runs = 5;
 
+    std::cout << "===== Benchmark running =====" << std::endl;
     for(int i = 0; i < nb_runs;i++) {
-        double naive = run_benchmark<Fifo<int>>();
-        double optimized = run_benchmark<Fifo2<int>>();
+        std::cout << "Iteration : " << i << std::endl;
+        double naive = run_benchmark<Fifo<MyBuffer<4096>>>();
+        double optimized = run_benchmark<Fifo2<MyBuffer<4096>>>();
         double speedup = naive / optimized;
         total += speedup;
     }
