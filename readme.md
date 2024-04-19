@@ -10,3 +10,9 @@
 ## Description of the project
 
 A set of codes that helped me to better understand c++
+
+### A few examples
+
+Compile time gcd with template metaprogramming
+
+![Compile time gcd](./metaprogramming/compile_time_gcd.png)
