@@ -7,19 +7,160 @@
  
 </div>
 
-## Description of the project
+### New important points by version
 
-A set of codes that helped me to better understand c++
+### C++ 11 - Language features
 
-### A few examples
+#### rvalue references
 
-Compile time gcd with template metaprogramming
+```cpp
+void foo(int& x) {}
+void foo(int&& x) {} // For rvalues only
+```
 
-![Compile time gcd](./metaprogramming/compile_time_gcd.png)
+#### Move semantics
+
+Moving an object is often cheaper than copying the entire object.
+
+#### Forwarding references (also known as universal references)
+
+Perfect forwarding: the ability to pass arguments while maintaining their value category.
+
+- T& & -> T&
+- T& && -> T&
+- T&& & -> T&
+- T&& && -> T&&
+
+#### Variadic templates
+
+... accepts zero or more arguments. We can then create an initializer list from a parameter pack to iterate over it.
+
+```cpp
+template<typename... arguments>
+void test {
+    auto list = {arguments...};
+    for(const auto& e: list) {
+        cout << e << endl;
+    }
+};
+```
+
+
+#### nullptr
+
+Type safe representation of null pointer. It replaces C NULL macro and is of type std::nullptr_t. Implicitly convertible to pointer types.
+
+#### Strongly-typed enums
+
+```c++
+enum class Test : int {
+    v1 = 0
+    v2 = 1
+}
+
+auto x = Test::v1; 
+```
+
+#### Attributes
+
+Universal syntax for all compilers.
+
+```c++
+class [[nodiscard]] my_class{}; // We should not discard the returned type of a function
+```
+
+#### Constexpr
+
+Set of expression that could potentially be evaluated by the compiler at compile time. Can be used for variables / functions. There is no guarantee regarding whether or not it will be evaluated at compile time.
+
+```c++
+constexpr int fib(int x) {
+    assert(x >= 0);
+    if(x == 0) return 0;
+    return fib(x-1) + fib(x-2);
+}
+```
+
+#### Delegating constructors
+
+Constructors can now call other constructors in the same class using an initializer list.
+
+#### Explicit virtual overrides
+
+use the override keyword. If the function doesn't override a parent's virtual function, you an throw a compiler error.
+
+#### Final keyword
+
+A virtual function can't be overridden from a derived calls.
+
+#### Default keyword
+
+Elegant and efficient way to provide default initialization of an object.
+
+#### Delete keyword
+
+Elegant and efficient way to provide a deleted implementation of a function.
+
+
+#### Ranged based for loop
+
+Syntatic sugar over iterator.
+
+```c++
+for(const auto& val: container) {
+    // Do something here
+}
+```
+
+#### move constructor and move assignment operator
+
+C++ 11 introduces a new constructor and a new assignment operator for move semantics.
+
+```cpp++
+struct A {
+    A(A&& other) {} // Move constructor
+    A& operator=(A&& other) { // Move assignment operator
+        // Do some stuff here
+        return *this;
+    }
+}
+```
+
+#### Converting constructors
+
+Converting constructors will convert values of braced list into constructor arguments.
+
+```c++
+struct A {
+    A(int) {}
+    A(int,int) {}
+};
+
+A a1 = {0}; // Calls first constructor
+A a2 = {0,0}; // Calls second constructor 
+```
+
+However if there is a constructor with initializer list, we will use this constructor instead.
+
+```c++
+struct A {
+    A(int) {}
+    A(int,int) {}
+    A(std::initializer_list<int>) {}
+};
+
+A a1 = {0}; // Calls last constructor
+A a2 = {0,0}; // Calls last constructor
+```
+
+
+
+
+
 
 ### Cpp11 stl features
 
-### std::move
+#### std::move
 
 std::move indicates that its resources can be transferred. 
 
@@ -56,7 +197,7 @@ auto future = std::async([std::launch::async | std::launch::deferred], foo);
 std::cout << future.get() << std::endl; // Wait for the result
 ```
 
-### std::forward
+#### std::forward
 
 std::forward allow to keep the value category and cv-qualifiers of an argument.
 
@@ -112,115 +253,10 @@ This keyword is used to create object of type std::reference_wrapper that holds 
 These two functions are used to return begin and end iterator generically and also works with raw arrays.
 
 
+## Compile time optimizations
 
-## Language feature cpp11
+Compile time gcd with template metaprogramming
 
-#### nullptr
-
-Type safe representation of null pointer. It replaces C NULL macro and is of type std::nullptr_t. Implicitly convertible to pointer types.
-
-#### Strongly-typed enums
-
-```c++
-enum class Test : int {
-    v1 = 0
-    v2 = 1
-}
-
-auto x = Test::v1; 
-```
-
-#### Attributes
-
-Universal syntax for all compilers.
-
-```c++
-class [[nodiscard]] my_class{}; // We should not discard the returned type of a function
-```
-
-#### Constexpr
-
-Set of expression that could potentially be evaluated by the compiler at compile time. Can be used for variables / functions. There is no guarantee regarding whether or not it will be evaluated at compile time.
-
-```c++
-constexpr int fib(int x) {
-    assert(x >= 0);
-    if(x == 0) return 0;
-    return fib(x-1) + fib(x-2);
-}
-```
-
-#### Delegating constructors
-
-Constructors can now call other constructors in the same class using an initializer list.
-
-#### Explicit virtual overrides
-
-use the override keyword. If the function doesn't override a parent's virtual function, you an throw a compiler error.
-
-#### Final keyword
-
-A virtual function can't be overridden from a derived calls. 
-
-#### Default keyword
-
-Elegant and efficient way to provide default initialization of an object.
-
-#### Delete keyword
-
-Elegant and efficient way to provide a deleted implementation of a function.
-
-
-#### Ranged based for loop 
-
-Syntatic sugar over iterator.
-
-```c++
-for(const auto& val: container) {
-    // Do something here
-}
-```
-
-#### move constructor and move assignment operator
-
-C++ 11 introduces a new constructor and a new assignment operator for move semantics.
-
-```cpp++
-struct A {
-    A(A&& other) {} // Move constructor
-    A& operator=(A&& other) { // Move assignment operator
-        // Do some stuff here
-        return *this;
-    }
-}
-```
-
-#### Converting constructors
-
-Converting constructors will convert values of braced list into constructor arguments.
-
-```c++
-struct A {
-    A(int) {}
-    A(int,int) {}
-};
-
-A a1 = {0}; // Calls first constructor
-A a2 = {0,0}; // Calls second constructor 
-```
-
-However if there is a constructor with initializer list, we will use this constructor instead. 
-
-```c++
-struct A {
-    A(int) {}
-    A(int,int) {}
-    A(std::initializer_list<int>) {}
-};
-
-A a1 = {0}; // Calls last constructor
-A a2 = {0,0}; // Calls last constructor
-```
-
+![Compile time gcd](./metaprogramming/compile_time_gcd.png)
 
 
