@@ -45,6 +45,57 @@ void test {
 };
 ```
 
+#### Initializer lists
+
+It corresponds to a lightweight array-like container using a braced list.
+
+```cpp
+vector<int> container = {1,2,3,4,5,6}; // Initializer list
+```
+
+#### Static assertion
+
+Compile time assertions
+
+```cpp
+static_assert(1 == 1); // 1 == 2 wouldn't allow the code to compile
+```
+
+#### auto keyword
+
+Type is deducted by the compiler according to the initializer. It helps a lot for code readability, especially for fancy types.
+
+```cpp
+auto x = 1;
+```
+
+#### Lambda expressions
+
+Unamed function that can return some value. It has a capture list ([] -> nothing, [=] -> by value, [&] -> by reference, [this] -> capture this by reference)
+
+```cpp
+auto increase_function = [](int x) -> int {
+    return x + 1;
+};
+```
+
+#### Declytpe keyword:
+
+Returns the decltype of an expression. Constant value qualifier are maintained
+
+```cpp
+const int a = 1;
+decltype(a) b = a; // decltype(a) is const int 
+```
+
+#### Type aliases
+
+Similar to typedef, but are easier to read and are compatible with templates.
+
+```cpp
+using vec_int = std::vector<int>;
+```
+
 
 #### nullptr
 
